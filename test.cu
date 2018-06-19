@@ -167,20 +167,8 @@ int main(int argc, char **argv)
 
     //frame << "P3\n" << totalColumns<< " " << 4800 + 6000 + 6000 + 4800<< "\n255\n";
 
-    short *memblock = new short[totalColumns];
-    short *d_memblock;
-    cudaMalloc((short **)&d_memblock, totalColumns * sizeof(short));
-    RGB *d_rgbValues;
-    cudaMalloc((RGB **)&d_rgbValues, totalColumns * sizeof(RGB));
-    RGB  *h_rgbValues = (RGB*)malloc(sizeof(RGB) * totalColumns);
-
-    cv::Size globeSize(totalColumns, totalRows);
-
-    cv::Mat globeImage(globeSize, CV_8UC3, cv::Scalar(0,255,0));
-
-    std::cout << "Image columns: " << globeImage.cols << std::endl;
-
-
+    short *memblock = new short[totalColumns * totalRows];
+    
     int rowCount = 0;
 
     for (int ii = 0; ii < 4; ii++)
@@ -200,50 +188,13 @@ int main(int argc, char **argv)
 
             for (int jj = 0; jj < rows[ii]; jj++)
             {
-                file1.read((char*)&memblock[0], columns * sizeof(short));
-                file2.read((char*)&memblock[columns], columns * sizeof(short));
-                file3.read((char*)&memblock[columns * 2], columns * sizeof(short));
-                file4.read((char*)&memblock[columns * 3], columns * sizeof(short));
-
-                CHECK(cudaMemcpy(d_memblock, memblock, sizeof(short) * totalColumns, cudaMemcpyHostToDevice));
-
-                ElvationToRGB <<<totalColumns, 1>>>(d_memblock,d_rgbValues);   
-
-                cudaError_t err = cudaGetLastError();
-
-                char any;
-                
-                if (err != cudaSuccess) 
-                {
-                    printf("Error: %s\n", cudaGetErrorString(err));
-                    std::cin >> any;
-                }
-
-                CHECK(cudaDeviceSynchronize()); 
-
-                CHECK(cudaMemcpy(h_rgbValues, d_rgbValues, sizeof(RGB) * totalColumns, cudaMemcpyDeviceToHost));
-
-
-                //for (int cc = 0; cc < totalColumns; cc++)
-                //{
-
-                      //frame << (int)(h_rgbValues[cc].R * 255) << " " << (int)(h_rgbValues[cc].G * 255) << " " << (int)(h_rgbValues[cc].B * 255) << "\n"; 
-                //}
-
-                uchar *ptr = globeImage.ptr(rowCount);
-                for (int col = 0; col < globeImage.cols; col++)
-                {
-                    uchar * uc_pixel = ptr;
-                    uc_pixel[0] = (int)(h_rgbValues[col].B * 255);
-                    uc_pixel[1] = (int)(h_rgbValues[col].G * 255);
-                    uc_pixel[2] = (int)(h_rgbValues[col].R * 255);           
-                    ptr += 3;
-                }
-
-                rowCount++;
-
+                file1.read((char*)&memblock[totalColumns * rowCount + 0], columns * sizeof(short));
+                file2.read((char*)&memblock[totalColumns * rowCount + columns], columns * sizeof(short));
+                file3.read((char*)&memblock[totalColumns * rowCount + columns * 2], columns * sizeof(short));
+                file4.read((char*)&memblock[totalColumns * rowCount + columns * 3], columns * sizeof(short));
 
                 //std::cout << "major: " << ii << ", row: " << jj << std::endl;
+                rowCount++;
             }
 
             file1.close();
@@ -258,6 +209,66 @@ int main(int argc, char **argv)
             return 0;
         } 
     }
+
+    std::cout << "Finished reading elevations" << std::endl;
+
+    cv::Size globeSize(totalColumns, totalRows);
+    cv::Mat globeImage(globeSize, CV_8UC3);
+
+    std::cout << "Created globeImage" << std::endl;
+
+    short *d_memblock;
+    CHECK(cudaMalloc((short **)&d_memblock, totalColumns * sizeof(short)));
+    RGB *d_rgbValues;
+    CHECK(cudaMalloc((RGB **)&d_rgbValues, totalColumns * sizeof(RGB)));
+    RGB  *h_rgbValues = (RGB*)malloc(sizeof(RGB) * totalColumns);
+
+
+    clock_t startTimeCuda = clock();
+
+    rowCount = 0;
+
+    while (rowCount < totalRows)
+    {
+
+      CHECK(cudaMemcpy(d_memblock, &memblock[rowCount * totalColumns], sizeof(short) * totalColumns, cudaMemcpyHostToDevice));
+
+      int blockSize = 1024;
+      int numBlocks = (totalColumns + blockSize - 1) / blockSize;
+
+      ElvationToRGB <<<numBlocks, blockSize>>>(d_memblock,d_rgbValues);   
+
+      cudaError_t err = cudaGetLastError();
+
+      char any;
+       
+      if (err != cudaSuccess) 
+      {
+          printf("Error: %s\n", cudaGetErrorString(err));
+          std::cin >> any;
+      }
+
+      CHECK(cudaDeviceSynchronize()); 
+
+      CHECK(cudaMemcpy(h_rgbValues, d_rgbValues, sizeof(RGB) * totalColumns, cudaMemcpyDeviceToHost));
+
+
+
+      uchar *ptr = globeImage.ptr(rowCount);
+      for (int col = 0; col < globeImage.cols; col++)
+      {
+          uchar * uc_pixel = ptr;
+          uc_pixel[0] = (int)(h_rgbValues[col].B * 255);
+          uc_pixel[1] = (int)(h_rgbValues[col].G * 255);
+          uc_pixel[2] = (int)(h_rgbValues[col].R * 255);           
+          ptr += 3;
+      }
+
+
+      rowCount++;
+    }
+
+    std::cout << "Finished computing rgb values in " << double( clock() - startTimeCuda ) / (double)CLOCKS_PER_SEC<< " seconds." << std::endl;
 
     std::cout << "Started globe.png write" << std::endl;
 

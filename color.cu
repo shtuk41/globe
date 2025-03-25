@@ -43,14 +43,6 @@ struct RGB
 
 };
 
-__device__ RGB ConvertBWRGB(float val)
-{
-
-  RGB rgb_temp;
-  rgb_temp.Set((uchar)(val), (uchar)(val), (uchar)(val));
-
-  return rgb_temp;
-}
 
 
 
@@ -104,7 +96,7 @@ __device__ float function_table(float in)//-407
     //                            8752.0, 250.0,
 
    float input[5] = {-407.0f,3345.0f, 7344.0f,8345.0f,8752.0f};
-   float output[5] = {0.1f,70.0f,135.0f,150.0f,255.0f};
+   float output[5] = {0.1f,70.0f,135.0f,150.0f,250.0f};
    
 
    float out;
@@ -147,11 +139,11 @@ __global__ void ElevationToRGB(short *elev, RGB* rgbValues)
     else if (mb < -407)
         mb = -407;
 
-    //mb =  8752 - 407 - mb;
+    mb =  8752 - 407 - mb;
 
     float H = function_table(mb);
 
-    RGB rgb  = ConvertBWRGB(H);
+    RGB rgb  = ConvertHSVtoRGB(H,1,1);
 
     rgbValues[threadId] = rgb;
 }
@@ -274,13 +266,13 @@ int main(int argc, char **argv)
 
     std::cout << "Finished computing rgb values in " << double( clock() - startTimeCuda ) / (double)CLOCKS_PER_SEC<< " seconds." << std::endl;
 
-    std::cout << "Started bw_globe.png write" << std::endl;
+    std::cout << "Started color_globe.png write" << std::endl;
 
     clock_t startTime = clock();
 
-    cv::imwrite( "bw_globe.png", globeImage );
+    cv::imwrite( "color_globe.png", globeImage );
 
-    std::cout << "Finished bw_globe.png in " << double( clock() - startTime ) / (double)CLOCKS_PER_SEC<< " seconds." << std::endl;
+    std::cout << "Finished color_globe.png in " << double( clock() - startTime ) / (double)CLOCKS_PER_SEC<< " seconds." << std::endl;
 
     delete [] memblock;
     cudaFree(d_memblock);

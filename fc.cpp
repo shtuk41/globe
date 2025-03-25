@@ -5,7 +5,8 @@ CTable::CTable() : input(0), output(0),numberPoints(0)
 
 }
 
-void CTable::Init(int n_points, ...)
+template<typename... Args>
+void CTable::Init(int n_points, Args... args)
 {
    numberPoints = n_points;
    input = new double[n_points];
@@ -13,13 +14,13 @@ void CTable::Init(int n_points, ...)
    
    va_list ap;
    va_start(ap, n_points);
-   for(int ii = 0; ii < n_points; ii++) 
-   {
-       input[ii]  = va_arg(ap, double);
-       output[ii]  = va_arg(ap, double);
-
+   
+   double values[] = { args... };
+   
+   for(int ii = 0; ii < n_points; ii++) {
+       input[ii]  = values[ii * 2];  // first value
+       output[ii] = values[ii * 2 + 1];  // second value
    }
-   va_end(ap);
 }
 
 double CTable::operator<<(double in)

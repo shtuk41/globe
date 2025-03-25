@@ -1,3 +1,6 @@
+#ifndef FC_GLOBE
+#define FC_GLOBE
+
 #include <stdarg.h>
 #include <iostream>
 
@@ -5,7 +8,9 @@ class CTable
 {
 public:
     CTable();
-    void Init(int n_points, ...);
+    
+    template<typename... Args>
+    void Init(int n_points, Args... args);
     double operator<<(double in);
     ~CTable();
 private:
@@ -13,3 +18,5 @@ private:
     double *output;
     int numberPoints;
 };
+
+#endif

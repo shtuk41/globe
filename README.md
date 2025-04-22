@@ -15,4 +15,5 @@ To view large images I use QGIS.
 <img src="README/color.png" alt="Screenshot">   
 
 <img src="README/bw.png" alt="Screenshot">   
->>>>>>> 67db31a8f347f173da49ca9995842bd01e1fbd34
+
+
